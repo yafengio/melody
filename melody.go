@@ -1,10 +1,14 @@
+// Copyright (c) 2015 Ola Holmström. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package melody
 
 import (
-	"net/http"
 	"sync"
 
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
+	"github.com/valyala/fasthttp"
 )
 
 // Close codes defined in RFC 6455, section 11.7.
@@ -26,16 +30,18 @@ const (
 	CloseTLSHandshake            = 1015
 )
 
-type handleMessageFunc func(*Session, []byte)
-type handleErrorFunc func(*Session, error)
-type handleCloseFunc func(*Session, int, string) error
-type handleSessionFunc func(*Session)
-type filterFunc func(*Session) bool
+type (
+	handleMessageFunc func(*Session, []byte)
+	handleErrorFunc   func(*Session, error)
+	handleCloseFunc   func(*Session, int, string) error
+	handleSessionFunc func(*Session)
+	filterFunc        func(*Session) bool
+)
 
 // Melody implements a websocket manager.
 type Melody struct {
 	Config                   *Config
-	Upgrader                 *websocket.Upgrader
+	Upgrader                 *websocket.FastHTTPUpgrader
 	messageHandler           handleMessageFunc
 	messageHandlerBinary     handleMessageFunc
 	messageSentHandler       handleMessageFunc
@@ -50,10 +56,10 @@ type Melody struct {
 
 // New creates a new melody instance with default Upgrader and Config.
 func New() *Melody {
-	upgrader := &websocket.Upgrader{
+	upgrader := &websocket.FastHTTPUpgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin:     func(r *http.Request) bool { return true },
+		CheckOrigin:     func(ctx *fasthttp.RequestCtx) bool { return true },
 	}
 
 	hub := newHub()
@@ -92,7 +98,7 @@ func (m *Melody) HandlePong(fn func(*Session)) {
 }
 
 // HandleMessage fires fn when a text message comes in.
-// NOTE: by default Melody handles messages sequentially for each
+// NOTE: by default melody handles messages sequentially for each
 // session. This has the effect that a message handler exceeding the
 // read deadline (Config.PongWait, by default 1 minute) will time out
 // the session. Concurrent message handling can be turned on by setting
@@ -141,50 +147,48 @@ func (m *Melody) HandleClose(fn func(*Session, int, string) error) {
 }
 
 // HandleRequest upgrades http requests to websocket connections and dispatches them to be handled by the melody instance.
-func (m *Melody) HandleRequest(w http.ResponseWriter, r *http.Request) error {
-	return m.HandleRequestWithKeys(w, r, nil)
+func (m *Melody) HandleRequest(ctx *fasthttp.RequestCtx) error {
+	return m.HandleRequestWithKeys(ctx, nil)
 }
 
 // HandleRequestWithKeys does the same as HandleRequest but populates session.Keys with keys.
-func (m *Melody) HandleRequestWithKeys(w http.ResponseWriter, r *http.Request, keys map[string]any) error {
+func (m *Melody) HandleRequestWithKeys(ctx *fasthttp.RequestCtx, keys map[string]any) error {
 	if m.hub.closed() {
 		return ErrClosed
 	}
 
-	conn, err := m.Upgrader.Upgrade(w, r, w.Header())
+	return m.Upgrader.Upgrade(ctx, m.fastHTTPHandler(ctx, keys))
+}
 
-	if err != nil {
-		return err
+func (m *Melody) fastHTTPHandler(ctx *fasthttp.RequestCtx, keys map[string]any) websocket.FastHTTPHandler {
+	return func(conn *websocket.Conn) {
+		session := &Session{
+			RequestCtx: ctx,
+			Keys:       keys,
+			conn:       conn,
+			output:     make(chan envelope, m.Config.MessageBufferSize),
+			outputDone: make(chan struct{}),
+			melody:     m,
+			open:       true,
+			rwmutex:    &sync.RWMutex{},
+		}
+
+		m.hub.register <- session
+
+		m.connectHandler(session)
+
+		go session.writePump()
+
+		session.readPump()
+
+		if !m.hub.closed() {
+			m.hub.unregister <- session
+		}
+
+		session.close()
+
+		m.disconnectHandler(session)
 	}
-
-	session := &Session{
-		Request:    r,
-		Keys:       keys,
-		conn:       conn,
-		output:     make(chan envelope, m.Config.MessageBufferSize),
-		outputDone: make(chan struct{}),
-		melody:     m,
-		open:       true,
-		rwmutex:    &sync.RWMutex{},
-	}
-
-	m.hub.register <- session
-
-	m.connectHandler(session)
-
-	go session.writePump()
-
-	session.readPump()
-
-	if !m.hub.closed() {
-		m.hub.unregister <- session
-	}
-
-	session.close()
-
-	m.disconnectHandler(session)
-
-	return nil
 }
 
 // Broadcast broadcasts a text message to all sessions.

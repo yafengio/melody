@@ -1,13 +1,10 @@
-# melody
+# Melody
 
-![Build Status](https://github.com/olahol/melody/actions/workflows/test.yml/badge.svg)
-[![Codecov](https://img.shields.io/codecov/c/github/olahol/melody)](https://app.codecov.io/github/olahol/melody)
-[![Go Report Card](https://goreportcard.com/badge/github.com/olahol/melody)](https://goreportcard.com/report/github.com/olahol/melody)
-[![GoDoc](https://godoc.org/github.com/olahol/melody?status.svg)](https://godoc.org/github.com/olahol/melody)
+This project is a fork of the latest version of [olahol/melody](https://github.com/olahol/melody) that continues its development independently.
 
-> :notes: Minimalist websocket framework for Go.
+> :notes: Minimalist websocket framework for Fasthttp.
 
-Melody is websocket framework based on [github.com/gorilla/websocket](https://github.com/gorilla/websocket)
+Melody is websocket framework based on [github.com/fasthttp/websocket](https://github.com/fasthttp/websocket)
 that abstracts away the tedious parts of handling websockets. It gets out of
 your way so you can write real-time apps. Features include:
 
@@ -20,12 +17,9 @@ your way so you can write real-time apps. Features include:
 ## Install
 
 ```bash
-go get github.com/olahol/melody
+go get github.com/maratrixx/melody
 ```
 
-## [Example: chat](https://github.com/olahol/melody/tree/master/examples/chat)
-
-[![Chat](https://cdn.rawgit.com/olahol/melody/master/examples/chat/demo.gif "Demo")](https://github.com/olahol/melody/tree/master/examples/chat)
 
 ```go
 package main
@@ -33,95 +27,81 @@ package main
 import (
 	"net/http"
 
-	"github.com/olahol/melody"
+	"github.com/maratrixx/melody"
 )
 
 func main() {
 	m := melody.New()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-	})
-
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		m.HandleRequest(w, r)
-	})
-
 	m.HandleMessage(func(s *melody.Session, msg []byte) {
-		m.Broadcast(msg)
+		s.Write(msg)
 	})
 
-	http.ListenAndServe(":5000", nil)
+	handler := func(ctx *fasthttp.RequestCtx) {
+		m.HandleRequest(ctx)
+	}
+
+	fasthttp.ListenAndServe(":5000", handler)
 }
 ```
 
-## [Example: gophers](https://github.com/olahol/melody/tree/master/examples/gophers)
+## Tests
 
-[![Gophers](https://cdn.rawgit.com/olahol/melody/master/examples/gophers/demo.gif "Demo")](https://github.com/olahol/melody/tree/master/examples/gophers)
+Here are the test results:
+```bash
+$ go test -timeout 100s github.com/maratrixx/melody -failfast -v -count=1 -cover
 
-```go
-package main
+output:
 
-import (
-	"fmt"
-	"net/http"
-	"sync/atomic"
-
-	"github.com/olahol/melody"
-)
-
-var idCounter atomic.Int64
-
-func main() {
-	m := melody.New()
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-	})
-
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		m.HandleRequest(w, r)
-	})
-
-	m.HandleConnect(func(s *melody.Session) {
-		id := idCounter.Add(1)
-
-		s.Set("id", id)
-
-		s.Write([]byte(fmt.Sprintf("iam %d", id)))
-	})
-
-	m.HandleDisconnect(func(s *melody.Session) {
-		if id, ok := s.Get("id"); ok {
-			m.BroadcastOthers([]byte(fmt.Sprintf("dis %d", id)), s)
-		}
-	})
-
-	m.HandleMessage(func(s *melody.Session, msg []byte) {
-		if id, ok := s.Get("id"); ok {
-			m.BroadcastOthers([]byte(fmt.Sprintf("set %d %s", id, msg)), s)
-		}
-	})
-
-	http.ListenAndServe(":5000", nil)
-}
-```
-
-### [More examples](https://github.com/olahol/melody/tree/master/examples)
-
-## [Documentation](https://godoc.org/github.com/olahol/melody)
-
-## Contributors
-
-<a href="https://github.com/olahol/melody/graphs/contributors">
-	<img src="https://contrib.rocks/image?repo=olahol/melody" />
-</a>
-
-## FAQ
-
-If you are getting a `403` when trying  to connect to your websocket you can [change allow all origin hosts](http://godoc.org/github.com/gorilla/websocket#hdr-Origin_Considerations):
-
-```go
-m := melody.New()
-m.Upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+=== RUN   TestEcho
+--- PASS: TestEcho (0.82s)
+=== RUN   TestEchoBinary
+--- PASS: TestEchoBinary (0.81s)
+=== RUN   TestWriteClosedServer
+--- PASS: TestWriteClosedServer (0.54s)
+=== RUN   TestWriteClosedClient
+--- PASS: TestWriteClosedClient (0.54s)
+=== RUN   TestUpgrader
+--- PASS: TestUpgrader (0.52s)
+=== RUN   TestBroadcast
+--- PASS: TestBroadcast (4.03s)
+=== RUN   TestClose
+--- PASS: TestClose (0.58s)
+=== RUN   TestLen
+--- PASS: TestLen (0.66s)
+=== RUN   TestSessions
+--- PASS: TestSessions (0.71s)
+=== RUN   TestPingPong
+--- PASS: TestPingPong (0.53s)
+=== RUN   TestHandleClose
+--- PASS: TestHandleClose (0.53s)
+=== RUN   TestHandleError
+--- PASS: TestHandleError (0.53s)
+=== RUN   TestErrClosed
+--- PASS: TestErrClosed (0.53s)
+=== RUN   TestErrSessionClosed
+--- PASS: TestErrSessionClosed (0.52s)
+=== RUN   TestErrMessageBufferFull
+--- PASS: TestErrMessageBufferFull (0.53s)
+=== RUN   TestSessionKeys
+--- PASS: TestSessionKeys (0.83s)
+=== RUN   TestSessionKeysConcurrent
+--- PASS: TestSessionKeysConcurrent (0.52s)
+=== RUN   TestMisc
+--- PASS: TestMisc (0.52s)
+=== RUN   TestHandleSentMessage
+--- PASS: TestHandleSentMessage (1.05s)
+=== RUN   TestConcurrentMessageHandling
+=== RUN   TestConcurrentMessageHandling/text_should_error
+=== RUN   TestConcurrentMessageHandling/text_should_not_error
+=== RUN   TestConcurrentMessageHandling/binary_should_error
+=== RUN   TestConcurrentMessageHandling/binary_should_not_error
+--- PASS: TestConcurrentMessageHandling (2.94s)
+    --- PASS: TestConcurrentMessageHandling/text_should_error (0.92s)
+    --- PASS: TestConcurrentMessageHandling/text_should_not_error (0.56s)
+    --- PASS: TestConcurrentMessageHandling/binary_should_error (0.93s)
+    --- PASS: TestConcurrentMessageHandling/binary_should_not_error (0.53s)
+PASS
+coverage: 98.1% of statements
+ok  	github.com/maratrixx/melody	18.486s	coverage: 98.1% of statements
 ```

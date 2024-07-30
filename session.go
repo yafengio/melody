@@ -1,17 +1,21 @@
+// Copyright (c) 2015 Ola Holmström. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package melody
 
 import (
 	"net"
-	"net/http"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
+	"github.com/valyala/fasthttp"
 )
 
 // Session wrapper around websocket connections.
 type Session struct {
-	Request    *http.Request
+	RequestCtx *fasthttp.RequestCtx
 	Keys       map[string]any
 	conn       *websocket.Conn
 	output     chan envelope
@@ -41,7 +45,6 @@ func (s *Session) writeRaw(message envelope) error {
 
 	s.conn.SetWriteDeadline(time.Now().Add(s.melody.Config.WriteWait))
 	err := s.conn.WriteMessage(message.t, message.msg)
-
 	if err != nil {
 		return err
 	}
@@ -80,7 +83,6 @@ loop:
 		select {
 		case msg := <-s.output:
 			err := s.writeRaw(msg)
-
 			if err != nil {
 				s.melody.errorHandler(s, err)
 				break loop
@@ -127,7 +129,6 @@ func (s *Session) readPump() {
 
 	for {
 		t, message, err := s.conn.ReadMessage()
-
 		if err != nil {
 			s.melody.errorHandler(s, err)
 			break

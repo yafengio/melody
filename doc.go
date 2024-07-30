@@ -8,15 +8,19 @@
 //
 // A broadcasting echo server:
 //
-//  func main() {
-//  	m := melody.New()
-//  	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-//  		m.HandleRequest(w, r)
-//  	})
-//  	m.HandleMessage(func(s *melody.Session, msg []byte) {
-//  		m.Broadcast(msg)
-//  	})
-//  	http.ListenAndServe(":5000", nil)
-//  }
+//
+// func main() {
+// 	m := melody.New()
+
+// 	m.HandleMessage(func(s *melody.Session, msg []byte) {
+// 		s.Write(msg)
+// 	})
+
+// 	handler := func(ctx *fasthttp.RequestCtx) {
+// 		m.HandleRequest(ctx)
+// 	}
+
+// 	fasthttp.ListenAndServe(":5000", handler)
+// }
 
 package melody
