@@ -17,7 +17,7 @@ your way so you can write real-time apps. Features include:
 ## Install
 
 ```bash
-go get github.com/maratrixx/melody
+go get github.com/yafengio/melody
 ```
 
 
@@ -27,7 +27,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/maratrixx/melody"
+	"github.com/yafengio/melody"
 )
 
 func main() {
@@ -49,7 +49,7 @@ func main() {
 
 Here are the test results:
 ```bash
-$ go test -timeout 100s github.com/maratrixx/melody -failfast -v -count=1 -cover
+$ go test -timeout 100s github.com/yafengio/melody -failfast -v -count=1 -cover
 
 output:
 
@@ -103,5 +103,5 @@ output:
     --- PASS: TestConcurrentMessageHandling/binary_should_not_error (0.53s)
 PASS
 coverage: 98.1% of statements
-ok  	github.com/maratrixx/melody	18.486s	coverage: 98.1% of statements
+ok  	github.com/yafengio/melody	18.486s	coverage: 98.1% of statements
 ```

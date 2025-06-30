@@ -7,8 +7,8 @@ import (
 	"log"
 	"log/slog"
 
-	"github.com/maratrixx/melody"
 	"github.com/valyala/fasthttp"
+	"github.com/yafengio/melody"
 )
 
 func main() {

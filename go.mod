@@ -1,4 +1,4 @@
-module github.com/maratrixx/melody
+module github.com/yafengio/melody
 
 go 1.19
 
